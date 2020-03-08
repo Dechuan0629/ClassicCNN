@@ -19,7 +19,7 @@ from VGG16 import VGG16
 
 path = 'D://驾驶行为//imgs//test//'
 device = torch.device('cuda')
-model = VGG16().to(device)
+model = ResNet18().to(device)
 # trained_model = resnet152(pretrained=True)
 # model = nn.Sequential(*list(trained_model.children())[0:-1],
 #                       Flatten(),
@@ -91,7 +91,7 @@ def main():
     viz = visdom.Visdom()
     img = TestLoad(path,224)
     img_test = DataLoader(img,shuffle=False,batch_size=1)
-    model.load_state_dict(torch.load('best_checkpoint_vgg.model'))
+    model.load_state_dict(torch.load('best_checkpoint_resnet18.model'))
     re = []
     for x,name in tqdm(img_test):
         print(x.shape)

@@ -31,7 +31,7 @@ def main():
 
     device = torch.device('cuda')
     # model = Lenet5().to(device)
-    model = VGG16().to(device)
+    model = ResNet18().to(device)
 
     criteon = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
@@ -39,7 +39,7 @@ def main():
     best_acc,best_epoch = 0,0
     # model.load_state_dict(torch.load('best_checkpoint.model'))
     global_step = 0
-    lr = 0.00001
+    lr = 0.0001
     for epoch in range(20):
         if (epoch+1)%5 == 0:
             lr/=2
@@ -92,7 +92,7 @@ def main():
                 best_epoch = epoch
                 best_acc = acc
                 if epoch == 0:continue
-                torch.save(model.state_dict(),'best_checkpoint_vgg.model')
+                torch.save(model.state_dict(),'best_checkpoint_resnet18.model')
         print(epoch, 'test acc:', acc)
         print('best epoch',best_epoch,'best acc',best_acc)
 

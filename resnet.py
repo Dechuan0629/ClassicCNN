@@ -56,22 +56,29 @@ class ResNet18(nn.Module):
         super(ResNet18, self).__init__()
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=3, padding=0),
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
             nn.BatchNorm2d(64)
         )
         # followed 4 blocks
+        # [b, 64, h, w] => [b, 64, h ,w]
+        self.blk1 = ResBlk(64, 64, stride=1)
         # [b, 64, h, w] => [b, 128, h ,w]
-        self.blk1 = ResBlk(64, 128, stride=2)
+        self.blk2 = ResBlk(64, 128, stride=1)
+        # [b, 128, h, w] => [b, 128, h ,w]
+        self.blk3 = ResBlk(128, 128, stride=2)
         # [b, 128, h, w] => [b, 256, h, w]
-        self.blk2 = ResBlk(128, 256, stride=2)
-        # # [b, 256, h, w] => [b, 512, h, w]
-        self.blk3 = ResBlk(256, 512, stride=2)
-        # # [b, 512, h, w] => [b, 1024, h, w]
-
-        self.blk4 = ResBlk(512, 512, stride=2)
+        self.blk4 = ResBlk(128, 256, stride=1)
+        # [b, 256, h, w] => [b, 256, h, w]
+        self.blk5 = ResBlk(256, 256, stride=2)
+        # [b, 256, h, w] => [b, 512, h, w]
+        self.blk6 = ResBlk(256, 512, stride=1)
+        # [b, 512, h, w] => [b, 512, h, w]
+        self.blk7 = ResBlk(512, 512, stride=2)
+        # [b, 512, h, w] => [b, 512, h, w]
+        self.blk8 = ResBlk(512, 512, stride=1)
 
         self.outlayer = nn.Linear(512*1*1, 10)
-        nn.Dropout(1)
+
 
     def forward(self, x):
         """
@@ -80,9 +87,9 @@ class ResNet18(nn.Module):
         :return:
         """
         x = F.relu(self.conv1(x))
-        x = F.max_pool2d_with_indices(x,kernel_size=3,stride=2,padding=1)
 
-        # [b, 64, h, w] => [b, 1024, h, w]
+        x = F.max_pool2d(x,kernel_size=3,stride=2,padding=1)
+
         x = self.blk1(x)
 
         x = self.blk2(x)
@@ -91,10 +98,15 @@ class ResNet18(nn.Module):
 
         x = self.blk4(x)
 
+        x = self.blk5(x)
 
+        x = self.blk6(x)
 
-        # print('after conv:', x.shape) #[b, 512, 2, 2]
-        # [b, 512, h, w] => [b, 512, 1, 1]
+        x = self.blk7(x)
+
+        x = self.blk8(x)
+
+        #After 1 conv layer and 8 residual blocks the shape of x :[b,3,224,224] => [b,512,7,7]
         x = F.adaptive_avg_pool2d(x, [1, 1])
         # print('after pool:', x.shape)
         x = x.view(x.size(0), -1)
@@ -103,4 +115,3 @@ class ResNet18(nn.Module):
 
 
         return x
-
