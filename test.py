@@ -10,7 +10,7 @@ import os
 from PIL import Image
 from tqdm import  tqdm
 import time
-from torchvision.models import resnet152,vgg16
+from torchvision.models import resnet152,vgg16,alexnet,resnet18
 from utils import Flatten
 from AlexNet import AlexNet
 from VGG16 import VGG16
@@ -27,14 +27,14 @@ model1 = nn.Sequential(*list(trained_model1.children())[0:-1],
                       nn.Linear(2048, 10)
                      ).to(device)
 
-trained_model = vgg16()
+trained_model = alexnet()
 trained_model.classifier = nn.Sequential(
-    nn.Linear(in_features=25088, out_features=4096, bias=True),
+    nn.Dropout(p=0.5, inplace=False),
+    nn.Linear(in_features=9216, out_features=4096, bias=True),
     nn.ReLU(inplace=True),
     nn.Dropout(p=0.5, inplace=False),
     nn.Linear(in_features=4096, out_features=4096, bias=True),
     nn.ReLU(inplace=True),
-    nn.Dropout(p=0.5, inplace=False),
     nn.Linear(in_features=4096, out_features=10, bias=True)
 )
 model = trained_model.to(device)
@@ -102,36 +102,38 @@ def main():
     import visdom
     batch_size = 32
     test = datasets.ImageFolder(path, transform=transforms.Compose([
-        transforms.Resize((224,224)),
+        transforms.Resize((227,227)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
     ]))
     img_test = DataLoader(test,shuffle=False,batch_size=8)
-    # model.load_state_dict(torch.load('best_checkpoint_transfered_vgg16_L2.model'))
-    model1.load_state_dict(torch.load('best_checkpoint_transfered_resnet152.model'))
+    model.load_state_dict(torch.load('temp/best_checkpoint_transfered_alex-epoch-9-.model'))
+    # model1.load_state_dict(torch.load('best_checkpoint_transfered_resnet152-1.model'))
+    # model2.load_state_dict(torch.load('best_checkpoint_transfered_resnet152-92.model'))
     criteon = nn.CrossEntropyLoss().to(device)
     count = 0
     loss = 0
     with torch.no_grad():
         total_correct = 0
         total_num = 0
-        # model.eval()
-        model1.eval()
+        model.eval()
+        # model1.eval()
+        # model2.eval()
         for x,label in tqdm(img_test):
             x, label = x.to(device), label.to(device)
 
-            # logits = model(x)
-            logits1 = model1(x)
-            # em_logits = 0.62*logits1+0.38*logits
-
-            pred = logits1.argmax(dim=1)
-            loss += criteon(logits1,label)
+            logits = model(x)
+            # logits1 = model1(x)
+            # logits2 = model2(x)
+            # em_logits = 0.6*logits1+0.4*logits2
+            pred = logits.argmax(dim=1)
+            loss += criteon(logits,label)
             count+=1
             correct = torch.eq(pred, label).float().sum().item()
             total_correct+=correct
             total_num+=x.size(0)
-        print("acc:",total_correct/total_num);
+        print("acc:",total_correct/total_num)
         print("loss:",loss.item()/count)
 
 

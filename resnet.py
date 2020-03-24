@@ -41,7 +41,6 @@ class ResBlk(nn.Module):
         # short cut.
         # extra module: [b, ch_in, h, w] => [b, ch_out, h, w]
         # element-wise add:
-        m = self.extra(x)
         out = self.extra(x) + out
         out = F.relu(out)
         

@@ -31,9 +31,8 @@ def main():
 
     device = torch.device('cuda')
 
-    trained_model = resnet152(pretrained=True)
-    for param in trained_model.parameters():
-        param.requires_grad = False
+    trained_model = resnet152()
+
     trained_model = nn.Sequential(*list(trained_model.children())[0:-1],
                           Flatten(),
                           nn.Linear(2048,10)
@@ -41,16 +40,16 @@ def main():
     model = trained_model.to(device)
 
     criteon = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001,weight_decay=0.001)
     print(model)
     best_acc,best_epoch = 0,0
-    model.load_state_dict(torch.load('best_checkpoint_transfered_resnet152.model'))
+    model.load_state_dict(torch.load('best_checkpoint_transfered_resnet152_classfy.model'))
     global_step = 0
     lr = 0.0001
     for epoch in range(20):
         if (epoch+1)%5 == 0:
             lr/=10
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+            optimizer = optim.Adam(model.parameters(), lr=lr,weight_decay=0.001)
         model.train()
         for batchidx, (x, label) in enumerate(cifar_train):
             # [b, 3, 32, 32]
@@ -120,7 +119,7 @@ def main():
                 best_epoch = epoch
                 best_acc = acc
                 if epoch == 0:continue
-                torch.save(model.state_dict(),'best_checkpoint_transfered_resnet152.model')
+                torch.save(model.state_dict(),'best_checkpoint_transfered_resnet152-1.model')
         print('epoch:',epoch, 'test acc:', acc)
         print('best epoch;',best_epoch,'best acc:',best_acc)
 

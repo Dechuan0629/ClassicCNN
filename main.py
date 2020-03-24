@@ -8,6 +8,7 @@ from    lenet5 import Lenet5
 from resnet import ResNet18
 from AlexNet import AlexNet
 from VGG16 import VGG16
+from torchvision.models import resnet18
 import visdom
 
 
@@ -28,30 +29,25 @@ def main():
     cifar_test = DataLoader(test_dataset, shuffle=True, batch_size=batch_size,num_workers=8)
     print(len(test),len(train_dataset),len(test_dataset))
 
-
     device = torch.device('cuda')
-    # model = Lenet5().to(device)
-    model = ResNet18().to(device)
-    mode11 = VGG16().to(device)
 
+    trained_model = resnet18()
+    trained_model.fc = nn.Linear(512,10,bias=True)
+
+    model = trained_model.to(device)
     criteon = nn.CrossEntropyLoss().to(device)
-    criteon1 = nn.CrossEntropyLoss().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.000001)
 
-    optimizer = optim.Adam(model.parameters(), lr=0.00001,weight_decay=0.01)
-    optimizer1 = optim.Adam(model.parameters(), lr=0.00001, weight_decay=0.01)
-
-    print(model,mode11)
+    print(model)
     best_acc,best_epoch = 0,0
-    # model.load_state_dict(torch.load('best_checkpoint.model'))
+    model.load_state_dict(torch.load('temp/best_checkpoint_transfered_resnet18-9-89.model'))
     global_step = 0
-    lr = 0.00001
+    lr = 0.000001
     for epoch in range(20):
         if (epoch+1)%5 == 0:
             lr/=2
-            optimizer = optim.Adam(model.parameters(), lr=lr,weight_decay=0.01)
-            optimizer1 = optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
         model.train()
-        mode11.train()
         for batchidx, (x, label) in enumerate(cifar_train):
             # [b, 3, 32, 32]
             # [b]
@@ -59,29 +55,27 @@ def main():
 
 
             logits = model(x)
-            logits1 = mode11(x)
 
             # logits: [b, 10]
             # label:  [b]
             # loss: tensor scalar
             loss = criteon(logits, label)
-            loss1 = criteon(logits1,label)
 
             # backprop
             optimizer.zero_grad()
-            optimizer.zero_grad()
+
             loss.backward()
-            loss1.backward()
+
             optimizer.step()
-            optimizer1.step()
+
             viz.line([loss.item()], [global_step], win='loss', update='append')
-            viz.line([loss1.item()], [global_step], win='loss1', update='append')
+
             global_step+=1
 
-        print('epoch:',epoch, 'resnet loss:', loss.item(),'vgg loss:',loss1.item())
+        print('epoch:',epoch, 'resnet loss:', loss.item())
 
         model.eval()
-        mode11.eval()
+
         with torch.no_grad():
             # test
             total_correct = 0
@@ -93,10 +87,10 @@ def main():
 
                 # [b, 10]
                 logits = model(x)
-                logits1 = mode11(x)
-                em_logits = 0.6*logits1+0.4*logits
+
+
                 # [b]
-                pred = em_logits.argmax(dim=1)
+                pred = logits.argmax(dim=1)
                 # [b] vs [b] => scalar tensor
                 correct = torch.eq(pred, label).float().sum().item()
                 total_correct += correct
@@ -107,7 +101,7 @@ def main():
         print("train acc :",acc)
 
         model.eval()
-        mode11.eval()
+
         with torch.no_grad():
             # test
             total_correct = 0
@@ -119,10 +113,10 @@ def main():
 
                 # [b, 10]
                 logits = model(x)
-                logits1 = mode11(x)
-                em_logits = 0.6 * logits1 + 0.4 * logits
+
+
                 # [b]
-                pred = em_logits.argmax(dim=1)
+                pred = logits.argmax(dim=1)
                 # [b] vs [b] => scalar tensor
                 correct = torch.eq(pred, label).float().sum().item()
                 total_correct += correct
@@ -134,7 +128,7 @@ def main():
                 best_epoch = epoch
                 best_acc = acc
                 if epoch == 0:continue
-                torch.save(model.state_dict(),'best_checkpoint_resnet18.model')
+            torch.save(model.state_dict(),'temp/best_checkpoint_transfered_resnet18-'+str(epoch+10)+'-.model')
         print('epoch:',epoch, 'test acc:', acc)
         print('best epoch:',best_epoch,'best acc:',best_acc)
 
