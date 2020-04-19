@@ -82,6 +82,7 @@ class VGG16(nn.Module):
         batchsz = x.size(0)
         # [b, 3, 224, 224] => [b, 512, 7, 7]
         x = self.conv_unit(x)
+        print(x.shape)
         # [b, 512, 7, 7] => [b, 512*7*7]
         x = x.view(batchsz,512*7*7)
         # [b, 512*7*7] => [b, 10]

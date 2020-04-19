@@ -114,3 +114,10 @@ class ResNet18(nn.Module):
 
 
         return x
+
+if __name__ == '__main__':
+    model = ResNet18()
+    x = torch.randn(8,3,640,320)
+    y = torch.randn(8,3,224,224)
+    print(model(x).shape)
+    print(model(y).shape)

@@ -8,45 +8,60 @@ from    lenet5 import Lenet5
 from resnet import ResNet18
 from AlexNet import AlexNet
 from VGG16 import VGG16
-from torchvision.models import resnet18
+from torchvision.models import densenet161
 import visdom
-
+from Inceptionv4 import inceptionv4
 
 def main():
     path = 'D://驾驶行为//imgs//train//'
+    path1 = 'D://驾驶行为//imgs//test_set//'
     batch_size = 16
     viz = visdom.Visdom()
-    test = datasets.ImageFolder(path, transform=transforms.Compose([
-        transforms.Resize((224,224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    cifar_train = DataLoader(datasets.ImageFolder(path, transform=transforms.Compose([
+                                    transforms.Resize((224,224)),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                         std=[0.229, 0.224, 0.225])
+                                ])),
+                             shuffle=True,
+                             batch_size=batch_size)
+
+    val_train = DataLoader(datasets.ImageFolder(path, transform=transforms.Compose([
+                            transforms.Resize((224, 224)),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
-    ]))
-    train_size = int(0.8 * len(test))
-    test_size = len(test) - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(test, [train_size, test_size])
-    cifar_train = DataLoader(train_dataset, shuffle=True, batch_size=batch_size,num_workers=8)
-    cifar_test = DataLoader(test_dataset, shuffle=True, batch_size=batch_size,num_workers=8)
-    print(len(test),len(train_dataset),len(test_dataset))
+                             ])),
+                            shuffle=False,
+                            batch_size=batch_size)
+
+    cifar_test = DataLoader(datasets.ImageFolder(path1, transform=transforms.Compose([
+                            transforms.Resize((224, 224)),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+                             ])),
+                            shuffle=False,
+                            batch_size=batch_size)
 
     device = torch.device('cuda')
 
-    trained_model = resnet18()
-    trained_model.fc = nn.Linear(512,10,bias=True)
+    trained_model = densenet161(pretrained=True)
+    trained_model.classifier = nn.Linear(in_features=2208, out_features=10, bias=True)
 
     model = trained_model.to(device)
+
     criteon = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.000001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001,weight_decay=0.0005)
 
     print(model)
     best_acc,best_epoch = 0,0
-    model.load_state_dict(torch.load('temp/best_checkpoint_transfered_resnet18-9-89.model'))
+    # model.load_state_dict(torch.load('temp/best_checkpoint_transfered_resnet18-9-89.model'))
     global_step = 0
-    lr = 0.000001
     for epoch in range(20):
         if (epoch+1)%5 == 0:
-            lr/=2
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+            for p in optimizer.param_groups:
+                p['lr'] *= 0.1
         model.train()
         for batchidx, (x, label) in enumerate(cifar_train):
             # [b, 3, 32, 32]
@@ -72,7 +87,7 @@ def main():
 
             global_step+=1
 
-        print('epoch:',epoch, 'resnet loss:', loss.item())
+        print('epoch:',epoch, 'loss:', loss.item())
 
         model.eval()
 
@@ -80,7 +95,7 @@ def main():
             # test
             total_correct = 0
             total_num = 0
-            for x, label in cifar_train:
+            for x, label in val_train:
                 # [b, 3, 32, 32]
                 # [b]
                 x, label = x.to(device), label.to(device)
@@ -128,7 +143,7 @@ def main():
                 best_epoch = epoch
                 best_acc = acc
                 if epoch == 0:continue
-            torch.save(model.state_dict(),'temp/best_checkpoint_transfered_resnet18-'+str(epoch+10)+'-.model')
+            torch.save(model.state_dict(),'temp/best_checkpoint_transfered_inceptionv4-'+str(epoch+10)+'-.model')
         print('epoch:',epoch, 'test acc:', acc)
         print('best epoch:',best_epoch,'best acc:',best_acc)
 

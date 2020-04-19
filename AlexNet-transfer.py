@@ -14,7 +14,6 @@ def main():
     batch_size = 32
     viz = visdom.Visdom()
     test = datasets.ImageFolder(path, transform=transforms.Compose([
-        transforms.Resize((227,227)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
@@ -43,22 +42,21 @@ def main():
 
     print(model)
     criteon = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.00001,weight_decay=0.01)
     best_acc,best_epoch = 0,0
     # model.load_state_dict(torch.load('best_checkpoint_transfered_alex_classfy.model'))
     global_step = 0
-    lr = 0.0001
-    for epoch in range(10):
-        if (epoch+1)%5 == 0:
-            lr/=2
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+    lr = 0.00001
+    for epoch in range(20):
+        if (epoch+1)%10 == 0:
+            lr/=10
+            optimizer = optim.Adam(model.parameters(), lr=lr,weight_decay=0.01)
         model.train()
         for batchidx, (x, label) in enumerate(cifar_train):
             # [b, 3, 32, 32]
             # [b]
             x, label = x.to(device), label.to(device)
-
-
+            print(x.shape)
             logits = model(x)
             # logits: [b, 10]
             # label:  [b]

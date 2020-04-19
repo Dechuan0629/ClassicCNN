@@ -62,3 +62,5 @@ class AlexNet(nn.Module):
         # loss = self.criteon(logits, y)
 
         return logits
+
+

@@ -3,33 +3,55 @@ from    torch.utils.data import DataLoader
 from    torchvision import datasets
 from    torchvision import transforms
 from    torch import nn, optim
-
-from torchvision.models import  vgg16
+import numpy as np
+from torchvision.models import  vgg16_bn
 import visdom
 
 
 
 def main():
     path = 'D://驾驶行为//imgs//train//'
-    batch_size = 32
+    path1 = 'D://驾驶行为//imgs//test_set//'
+    batch_size = 16
     viz = visdom.Visdom()
-    test = datasets.ImageFolder(path, transform=transforms.Compose([
-        transforms.Resize((224,224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+
+    cifar_train = DataLoader(datasets.ImageFolder(path, transform=transforms.Compose([
+                             transforms.Resize((224,224)),
+                             transforms.RandomCrop((180,180)),
+                             transforms.RandomRotation(20),
+                             transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=0.5),
+                             transforms.RandomGrayscale(0.4),
+                             transforms.ToTensor(),
+                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                  std=[0.229, 0.224, 0.225])
+                            ])),
+                             shuffle=True,
+                             batch_size=batch_size)
+
+    val_train = DataLoader(datasets.ImageFolder(path, transform=transforms.Compose([
+                            transforms.Resize((224, 224)),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
-    ]))
-    train_size = int(0.8 * len(test))
-    test_size = len(test) - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(test, [train_size, test_size])
-    cifar_train = DataLoader(train_dataset, shuffle=True, batch_size=batch_size,num_workers=8)
-    cifar_test = DataLoader(test_dataset, shuffle=True, batch_size=batch_size,num_workers=8)
-    print(len(test),len(train_dataset),len(test_dataset))
+                             ])),
+                            shuffle=False,
+                            batch_size=batch_size,
+                            num_workers=8)
+
+    cifar_test = DataLoader(datasets.ImageFolder(path1, transform=transforms.Compose([
+                            transforms.Resize((224, 224)),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+                             ])),
+                            shuffle=False,
+                            batch_size=batch_size,
+                            num_workers=8)
 
 
     device = torch.device('cuda')
 
-    trained_model = vgg16(pretrained=True)
+    trained_model = vgg16_bn(pretrained=True)
     trained_model.classifier = nn.Sequential(
                 nn.Linear(in_features=25088, out_features=4096, bias=True),
                 nn.ReLU(inplace=True),
@@ -42,28 +64,27 @@ def main():
     model = trained_model.to(device)
     print(model)
     criteon = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.00001,weight_decay=0.0005)
     best_acc,best_epoch = 0,0
     # model.load_state_dict(torch.load('best_checkpoint_transfered_vgg16_L2-77.model'))
     global_step = 0
-    lr = 0.0001
-    for epoch in range(10):
+    for epoch in range(20):
         if (epoch+1)%5 == 0:
-            lr/=2
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+            for p in optimizer.param_groups:
+                p['lr'] *= 0.1
         model.train()
+        total_loss = 0
         for batchidx, (x, label) in enumerate(cifar_train):
             # [b, 3, 32, 32]
             # [b]
-            x, label = x.to(device), label.to(device)
-
+            x,lable = x.to(device),label.to(device)
 
             logits = model(x)
             # logits: [b, 10]
             # label:  [b]
             # loss: tensor scalar
-            loss = criteon(logits, label)
-
+            loss = criteon(logits, lable)
+            total_loss+=loss.item()
             # backprop
             optimizer.zero_grad()
             loss.backward()
@@ -71,13 +92,13 @@ def main():
             viz.line([loss.item()], [global_step], win='loss', update='append')
             global_step+=1
 
-        print(epoch, 'loss:', loss.item())
+        print(epoch, 'loss:', total_loss/len(cifar_train))
         model.eval()
         with torch.no_grad():
             # test
             total_correct = 0
             total_num = 0
-            for x, label in cifar_train:
+            for x, label in val_train:
                 # [b, 3, 32, 32]
                 # [b]
                 x, label = x.to(device), label.to(device)
@@ -120,7 +141,7 @@ def main():
                 best_epoch = epoch
                 best_acc = acc
                 if epoch == 0:continue
-            torch.save(model.state_dict(),'temp/best_checkpoint_transfered_vgg16-epoch-'+str(epoch)+'-.model')
+            torch.save(model.state_dict(),'temp/best_checkpoint_transfered_vgg16_bn-epoch-'+str(epoch)+'-.model')
         print(epoch, 'test acc:', acc)
         print('best epoch',best_epoch,'best acc',best_acc)
 
